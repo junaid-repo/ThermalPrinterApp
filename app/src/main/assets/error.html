@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connection Error</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Helvetica Neue', sans-serif;
+            background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            color: #333;
+        }
+        .icon {
+            font-size: 80px;
+            margin-bottom: 20px;
+            animation: float 3s ease-in-out infinite;
+        }
+        h1 {
+            font-size: 24px;
+            font-weight: 900;
+            margin: 0 0 10px 0;
+            color: #ff4757;
+        }
+        p {
+            font-size: 14px;
+            color: #747d8c;
+            margin: 0 0 30px 0;
+            padding: 0 20px;
+        }
+        button {
+            background-color: #2ed573;
+            color: white;
+            border: none;
+            padding: 14px 32px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 50px;
+            box-shadow: 0 4px 15px rgba(46, 213, 115, 0.3);
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        button:active {
+            transform: scale(0.95);
+        }
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-15px); }
+            100% { transform: translateY(0px); }
+        }
+    </style>
+</head>
+<body>
+    <div class="icon">🔌</div>
+    <h1>Server Unreachable</h1>
+    <p>We couldn't connect to the server. Please check your network or ensure the dev server is running.</p>
+
+    <button onclick="window.Android.retryConnection()">Try Again</button>
+</body>
+</html>

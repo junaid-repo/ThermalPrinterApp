@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1049895145792",
+    "project_id": "clearbills-b81f5",
+    "storage_bucket": "clearbills-b81f5.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1049895145792:android:a2ab8158a5c19293d36aa5",
+        "android_client_info": {
+          "package_name": "com.example.thermalprinterapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBIG3eVmV8A-34Woe-XlxB0iRO0n2EQ57c"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
