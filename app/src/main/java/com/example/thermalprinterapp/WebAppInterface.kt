@@ -4,10 +4,11 @@ import android.Manifest
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothSocket
-import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.net.Uri
 import android.util.Base64
 import android.util.Log
 import android.webkit.JavascriptInterface
@@ -18,6 +19,7 @@ import androidx.core.app.ActivityCompat
 import androidx.print.PrintHelper
 import java.io.IOException
 import java.util.UUID
+
 
 class WebAppInterface(private val activity: AppCompatActivity, private val webView: WebView) {
 
@@ -30,6 +32,18 @@ class WebAppInterface(private val activity: AppCompatActivity, private val webVi
         activity.runOnUiThread {
             biometricHelper.saveCredentials(username, pass)
         }
+    }
+
+    @JavascriptInterface
+    fun openDialer(phoneNumber: String?) {
+        val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + phoneNumber))
+        activity.startActivity(intent)
+    }
+
+    @JavascriptInterface
+    fun openEmailClient(email: String?) {
+        val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:" + email))
+        activity.startActivity(intent)
     }
 
     @JavascriptInterface

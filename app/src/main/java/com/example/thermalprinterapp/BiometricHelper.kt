@@ -7,6 +7,7 @@ import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import android.widget.Toast
 import org.json.JSONObject
+import androidx.biometric.BiometricManager
 
 class BiometricHelper(private val activity: AppCompatActivity) {
 
@@ -42,6 +43,7 @@ class BiometricHelper(private val activity: AppCompatActivity) {
     }
 
     // ✅ AUTHENTICATE & RETURN CREDENTIALS
+    // ✅ AUTHENTICATE & RETURN CREDENTIALS
     fun authenticate(onSuccess: (String, String) -> Unit) {
         val executor = ContextCompat.getMainExecutor(activity)
 
@@ -61,14 +63,19 @@ class BiometricHelper(private val activity: AppCompatActivity) {
 
                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                     super.onAuthenticationError(errorCode, errString)
-                    Toast.makeText(activity, "Auth Error: $errString", Toast.LENGTH_SHORT).show()
+                    // Optional: You might want to ignore the "User canceled" error so it doesn't show a toast
+                    if (errorCode != BiometricPrompt.ERROR_USER_CANCELED) {
+                        Toast.makeText(activity, "Auth Error: $errString", Toast.LENGTH_SHORT).show()
+                    }
                 }
             })
 
+        // 🟢 UPDATED: Allow Biometric OR Device Credential (PIN/Pattern/Password)
         val promptInfo = BiometricPrompt.PromptInfo.Builder()
-            .setTitle("Biometric Login")
-            .setSubtitle("Log in using your fingerprint")
-            .setNegativeButtonText("Cancel")
+            .setTitle("Secure Login")
+            .setSubtitle("Log in using your biometric or screen lock")
+            .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL)
+            // ⚠️ DO NOT add .setNegativeButtonText("Cancel") here. It will crash the app!
             .build()
 
         biometricPrompt.authenticate(promptInfo)

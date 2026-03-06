@@ -9,6 +9,7 @@ import android.net.http.SslError
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
+import android.os.Message // 🟢 Added for Razorpay window creation
 import android.provider.MediaStore
 import android.util.Log
 import android.view.ViewGroup
@@ -27,7 +28,7 @@ class MainActivity : AppCompatActivity() {
 
     // ⚠️ Ensure this is correct (HTTPS or Local IP)
     //private val MAIN_URL = "http://10.152.170.58:3000/"
-   private val MAIN_URL = "https://clearbills.store/"
+    private val MAIN_URL = "https://clearbills.info/"
 
     private lateinit var webView: WebView
     private lateinit var swipeRefreshLayout: SwipeRefreshLayout
@@ -121,11 +122,14 @@ class MainActivity : AppCompatActivity() {
         webView.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
-            javaScriptCanOpenWindowsAutomatically = true
             allowFileAccess = true
             allowContentAccess = true
             mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
             userAgentString = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+
+            // 🟢 Settings required for Razorpay Popups
+            setSupportMultipleWindows(true)
+            javaScriptCanOpenWindowsAutomatically = true
         }
 
         webView.setDownloadListener { url, userAgent, contentDisposition, mimeType, _ ->
@@ -142,12 +146,29 @@ class MainActivity : AppCompatActivity() {
                 swipeRefreshLayout.isRefreshing = false
             }
 
+            // 🟢 Handles opening external UPI apps (GPay, PhonePe, Paytm)
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
-                return false
+                val url = request?.url?.toString() ?: return false
+
+                // If it's a standard web URL, let the WebView handle it
+                if (url.startsWith("http://") || url.startsWith("https://")) {
+                    return false
+                }
+
+                // If it's a UPI link or Intent, hand it to the Android OS
+                try {
+                    val intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME)
+                    startActivity(intent)
+                    return true
+                } catch (e: Exception) {
+                    Log.e("WebView", "App not installed or intent failed for URL: $url")
+                }
+
+                return true
             }
         }
 
-        // 🟢 3. WebChromeClient Updated with File Chooser Logic
+        // 🟢 3. WebChromeClient Updated with File Chooser & Razorpay Multi-Window Logic
         webView.webChromeClient = object : WebChromeClient() {
 
             // Handle Camera/Microphone permissions from JS
@@ -155,7 +176,59 @@ class MainActivity : AppCompatActivity() {
                 runOnUiThread { request.grant(request.resources) }
             }
 
-            // Handle <input type="file"> clicks
+            // 🟢 Razorpay Popup Handling (Creates a temporary WebView for Bank OTP/3D Secure)
+            override fun onCreateWindow(
+                view: WebView?,
+                isDialog: Boolean,
+                isUserGesture: Boolean,
+                resultMsg: Message?
+            ): Boolean {
+                val newWebView = WebView(this@MainActivity).apply {
+                    settings.javaScriptEnabled = true
+                    settings.domStorageEnabled = true
+                    settings.setSupportZoom(true)
+                    settings.builtInZoomControls = true
+                    settings.displayZoomControls = false
+                    layoutParams = ViewGroup.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT
+                    )
+                }
+
+                val rootLayout = findViewById<ViewGroup>(android.R.id.content)
+                rootLayout.addView(newWebView)
+
+                newWebView.webChromeClient = object : WebChromeClient() {
+                    override fun onCloseWindow(window: WebView?) {
+                        rootLayout.removeView(newWebView)
+                        newWebView.destroy()
+                    }
+                }
+
+                newWebView.webViewClient = object : WebViewClient() {
+                    override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                        val url = request?.url?.toString() ?: return false
+                        if (!url.startsWith("http://") && !url.startsWith("https://")) {
+                            try {
+                                val intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME)
+                                startActivity(intent)
+                                return true
+                            } catch (e: Exception) {
+                                Log.e("WebView", "Intent failed in popup")
+                            }
+                        }
+                        return false
+                    }
+                }
+
+                val transport = resultMsg?.obj as WebView.WebViewTransport
+                transport.webView = newWebView
+                resultMsg.sendToTarget()
+
+                return true
+            }
+
+            // Handle <input type="file"> clicks (Camera & Gallery)
             override fun onShowFileChooser(
                 webView: WebView?,
                 filePathCallback: ValueCallback<Array<Uri>>?,
@@ -211,6 +284,7 @@ class MainActivity : AppCompatActivity() {
                     this@MainActivity.filePathCallback = null
                     return false
                 }
+
                 return true
             }
         }
