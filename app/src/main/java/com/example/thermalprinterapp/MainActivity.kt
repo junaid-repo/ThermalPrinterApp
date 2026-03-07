@@ -19,6 +19,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+import com.google.firebase.messaging.FirebaseMessaging
 import java.io.File
 import java.io.IOException
 import java.text.SimpleDateFormat
@@ -27,8 +28,8 @@ import java.util.*
 class MainActivity : AppCompatActivity() {
 
     // ⚠️ Ensure this is correct (HTTPS or Local IP)
-    //private val MAIN_URL = "http://10.152.170.58:3000/"
-    private val MAIN_URL = "https://clearbills.info/"
+    private val MAIN_URL = "http://192.168.29.241:3000"
+    //private val MAIN_URL = "https://clearbills.info/"
 
     private lateinit var webView: WebView
     private lateinit var swipeRefreshLayout: SwipeRefreshLayout
@@ -87,6 +88,18 @@ class MainActivity : AppCompatActivity() {
         setupSwipeRefresh()
         checkPermissions()
 
+
+        // 🟢 Default URL
+        var urlToLoad = MAIN_URL
+
+        // 🟢 Check if the app was opened from a Push Notification click
+        if (intent.extras != null && intent.hasExtra("TARGET_URL")) {
+            val targetUrl = intent.getStringExtra("TARGET_URL")
+            if (targetUrl != null) {
+                urlToLoad = targetUrl // Override default URL with the specific notification URL
+            }
+        }
+
         // 5. Add JS Interface & Load
         webView.addJavascriptInterface(WebAppInterface(this, webView), "Android")
         webView.loadUrl(MAIN_URL)
@@ -97,6 +110,7 @@ class MainActivity : AppCompatActivity() {
                 if (webView.canGoBack()) webView.goBack() else isEnabled = false
             }
         })
+
     }
 
     private fun setupSwipeRefresh() {
@@ -144,6 +158,30 @@ class MainActivity : AppCompatActivity() {
 
             override fun onPageFinished(view: WebView?, url: String?) {
                 swipeRefreshLayout.isRefreshing = false
+
+                FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+                    if (task.isSuccessful) {
+                        val token = task.result
+                        Log.d("FCM", "Token fetched, waiting for React to catch it: $token")
+
+                        // 🟢 Smart JS injector: Checks every 500ms until React is fully hydrated
+                        val jsCode = """
+                    javascript:(function() {
+                        var attempts = 0;
+                        var checkAndSend = setInterval(function() {
+                            if (typeof window.receiveAndroidFcmToken === 'function') {
+                                window.receiveAndroidFcmToken('$token');
+                                clearInterval(checkAndSend);
+                            }
+                            attempts++;
+                            if (attempts > 10) clearInterval(checkAndSend); // Stop trying after 5 seconds
+                        }, 500);
+                    })();
+                """.trimIndent()
+
+                        view?.evaluateJavascript(jsCode, null)
+                    }
+                }
             }
 
             // 🟢 Handles opening external UPI apps (GPay, PhonePe, Paytm)
