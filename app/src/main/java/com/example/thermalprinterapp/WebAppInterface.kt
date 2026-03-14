@@ -8,14 +8,17 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Color
 import android.net.Uri
 import android.util.Base64
 import android.util.Log
+import android.view.WindowManager
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import androidx.core.view.WindowCompat
 import androidx.print.PrintHelper
 import java.io.IOException
 import java.util.UUID
@@ -33,6 +36,37 @@ class WebAppInterface(private val activity: AppCompatActivity, private val webVi
             biometricHelper.saveCredentials(username, pass)
         }
     }
+    @JavascriptInterface
+    fun setSystemTheme(colorHex: String, isLightMode: Boolean) {
+        activity.runOnUiThread {
+            try {
+                // 🟢 UNCOMMENT THIS LINE if you want to see a popup proving React is talking to Android!
+                // Toast.makeText(activity, "React set theme to: $colorHex", Toast.LENGTH_SHORT).show()
+
+                val window = activity.window
+
+                window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS)
+                window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
+
+                val parsedColor = Color.parseColor(colorHex)
+
+                // Color the top and bottom bars
+                window.statusBarColor = parsedColor
+                window.navigationBarColor = parsedColor
+
+                // 🟢 THE NEW FIX: Color the absolute background of the app so the padding void isn't white!
+                window.decorView.setBackgroundColor(parsedColor)
+
+                // Flip the Battery/Wifi icons so they are readable
+                val windowController = WindowCompat.getInsetsController(window, window.decorView)
+                windowController.isAppearanceLightStatusBars = isLightMode
+                windowController.isAppearanceLightNavigationBars = isLightMode
+
+            } catch (e: Exception) {
+                Log.e("THEME", "Failed to parse theme color from React: ${e.message}")
+            }
+        }
+    }
 
     @JavascriptInterface
     fun openDialer(phoneNumber: String?) {
@@ -44,6 +78,24 @@ class WebAppInterface(private val activity: AppCompatActivity, private val webVi
     fun openEmailClient(email: String?) {
         val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:" + email))
         activity.startActivity(intent)
+    }
+    // 🟢 NEW: Method to start Native Google Login
+    @JavascriptInterface
+    fun startNativeGoogleLogin() {
+        activity.runOnUiThread {
+            if (activity is MainActivity) {
+                activity.startGoogleOneTapLogin()
+            }
+        }
+    }
+    @JavascriptInterface
+    fun pickContact() {
+        // Must run on UI Thread to launch activities
+        activity.runOnUiThread {
+            if (activity is MainActivity) {
+                activity.launchContactPicker()
+            }
+        }
     }
 
     @JavascriptInterface
