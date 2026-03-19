@@ -6,17 +6,17 @@ plugins {
 }
 
 android {
-    namespace 'com.example.thermalprinterapp'
+    namespace 'info.clearbills.app'
     compileSdk {
         version = release(36)
     }
 
     defaultConfig {
-        applicationId "com.example.thermalprinterapp"
+        applicationId "info.clearbills.app"
         minSdk 23
         targetSdk 36
-        versionCode 1
-        versionName "1.0"
+        versionCode 5
+        versionName "1.0.2"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
