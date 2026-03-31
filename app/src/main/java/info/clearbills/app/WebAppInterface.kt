@@ -302,4 +302,9 @@ class WebAppInterface(private val activity: AppCompatActivity, private val webVi
             }
         }
     }
+    @JavascriptInterface
+    fun saveAuthToken(token: String) {
+        val prefs = activity.getSharedPreferences("ClearBillsPrefs", Context.MODE_PRIVATE)
+        prefs.edit().putString("jwt_token", token).apply()
+    }
 }

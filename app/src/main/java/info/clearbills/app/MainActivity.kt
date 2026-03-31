@@ -56,12 +56,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var swipeRefreshLayout: SwipeRefreshLayout
     private lateinit var downloadHandler: DownloadHandler
 
-    // 🟢 1. WebView File Upload Variables
-    private var filePathCallback: ValueCallback<Array<Uri>>? = null
+     private var filePathCallback: ValueCallback<Array<Uri>>? = null
     private var cameraPhotoPath: String? = null
 
-    // 🟢 2. Activity Result Launcher
-    private val fileChooserLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+     private val fileChooserLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         var results: Array<Uri>? = null
 
         if (result.resultCode == Activity.RESULT_OK) {
@@ -159,18 +157,29 @@ class MainActivity : AppCompatActivity() {
         if (intent.extras != null && intent.hasExtra("TARGET_URL")) {
             val targetUrl = intent.getStringExtra("TARGET_URL")
 
-            // 🟢 THE FIX (Issue 2: Cross-App Scripting): Validate incoming intents
             if (targetUrl != null) {
-                if (targetUrl.startsWith("https://clearbills.info") ||
-                    targetUrl.startsWith("https://clearbill.store") ||
-                    targetUrl.startsWith("http://172.")) {
-                    urlToLoad = targetUrl
-                } else {
-                    Log.w("Security", "Blocked untrusted intent URL: $targetUrl")
+                try {
+                     val parsedUri = Uri.parse(targetUrl)
+                    val host = parsedUri.host ?: ""
+
+                     val isSafeHost = host == "clearbills.info" ||
+                            host == "www.clearbills.info" ||
+                            host == "clearbill.store" ||
+                            host == "www.clearbill.store"
+
+
+                    if (isSafeHost) {
+                        urlToLoad = targetUrl
+                    } else {
+                        Log.w("Security", "Blocked untrusted intent URL host: $host")
+                        urlToLoad = MAIN_URL
+                    }
+                } catch (e: Exception) {
+                    Log.e("Security", "Malformed URL in intent", e)
+                    urlToLoad = MAIN_URL
                 }
             }
         }
-
         webView.addJavascriptInterface(WebAppInterface(this, webView), "Android")
         webView.loadUrl(urlToLoad)
 
