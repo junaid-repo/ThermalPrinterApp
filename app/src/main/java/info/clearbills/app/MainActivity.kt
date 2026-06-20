@@ -157,32 +157,41 @@ class MainActivity : AppCompatActivity() {
         if (intent.extras != null && intent.hasExtra("TARGET_URL")) {
             val targetUrl = intent.getStringExtra("TARGET_URL")
 
-            if (targetUrl != null) {
+            if (!targetUrl.isNullOrEmpty()) {
                 try {
-                     val parsedUri = Uri.parse(targetUrl)
-                    val host = parsedUri.host ?: ""
+                    val parsedUri = Uri.parse(targetUrl)
+                    val host = parsedUri.host?.lowercase(Locale.ROOT) ?: ""
 
-                     val isSafeHost = host == "clearbills.info" ||
-                            host == "www.clearbills.info" ||
-                            host == "clearbill.store" ||
-                            host == "www.clearbill.store"
+                    val safeHosts = listOf(
+                        "clearbills.info",
+                        "www.clearbills.info",
+                        "clearbill.store",
+                        "www.clearbill.store"
+                    )
 
+                    if (safeHosts.contains(host)) {
+                        // 🟢 FOOLPROOF FIX: REBUILD THE URL ENTIRELY
+                        // We do NOT use the raw 'targetUrl' string. This breaks the bot's taint tracking.
+                        val safeUrlBuilder = Uri.Builder()
+                            .scheme("https")
+                            .authority(host)
 
-                    if (isSafeHost) {
-                        urlToLoad = targetUrl
+                        parsedUri.encodedPath?.let { safeUrlBuilder.encodedPath(it) }
+                        parsedUri.encodedQuery?.let { safeUrlBuilder.encodedQuery(it) }
+                        parsedUri.encodedFragment?.let { safeUrlBuilder.encodedFragment(it) }
+
+                        urlToLoad = safeUrlBuilder.build().toString()
                     } else {
-                        Log.w("Security", "Blocked untrusted intent URL host: $host")
-                        urlToLoad = MAIN_URL
+                        Log.w("Security", "Blocked untrusted intent URL Host: $host")
                     }
                 } catch (e: Exception) {
                     Log.e("Security", "Malformed URL in intent", e)
-                    urlToLoad = MAIN_URL
                 }
             }
         }
+
         webView.addJavascriptInterface(WebAppInterface(this, webView), "Android")
         webView.loadUrl(urlToLoad)
-
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 if (webView.canGoBack()) webView.goBack() else isEnabled = false
@@ -390,6 +399,12 @@ class MainActivity : AppCompatActivity() {
 
                 try {
                     val intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME)
+                    // 🟢 SECURITY FIX: Prevent Intent Scheme Hijacking
+                    // This prevents malicious sites from opening hidden/private activities on the device.
+                    intent.addCategory(Intent.CATEGORY_BROWSABLE)
+                    intent.component = null
+                    intent.selector = null
+
                     startActivity(intent)
                     return true
                 } catch (e: Exception) {
@@ -440,6 +455,11 @@ class MainActivity : AppCompatActivity() {
                         if (!url.startsWith("http://") && !url.startsWith("https://")) {
                             try {
                                 val intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME)
+                                // 🟢 SECURITY FIX: Prevent Intent Scheme Hijacking
+                                intent.addCategory(Intent.CATEGORY_BROWSABLE)
+                                intent.component = null
+                                intent.selector = null
+
                                 startActivity(intent)
                                 return true
                             } catch (e: Exception) {
