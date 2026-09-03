@@ -5,39 +5,38 @@ import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
+import android.database.Cursor
 import android.graphics.Color
 import android.net.Uri
 import android.net.http.SslError
-import android.provider.ContactsContract
-import android.database.Cursor
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.os.Message
+import android.provider.ContactsContract
 import android.provider.MediaStore
 import android.util.Log
 import android.view.ViewGroup
-import android.view.WindowManager
 import android.webkit.*
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.FileProvider
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
-import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.FileProvider
-import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
-import com.google.firebase.messaging.FirebaseMessaging
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialException
+import androidx.lifecycle.lifecycleScope
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import com.google.firebase.messaging.FirebaseMessaging
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions
 import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
-import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import java.io.File
 import java.io.IOException
@@ -46,9 +45,28 @@ import java.util.*
 
 class MainActivity : AppCompatActivity() {
 
-    // ⚠️ Ensure this is correct (HTTPS or Local IP)
-    //private val MAIN_URL = "http://10.229.79.219:3000"
-    private val MAIN_URL = "https://clearbills.info/"
+    private val mainUrl by lazy {
+        if (packageName.endsWith(".preprod")) {
+            "https://preprod.instabill.in/"
+        } else {
+            "https://instabill.in/"
+        }
+    }
+
+    private val trustedNotificationHosts by lazy {
+        if (Uri.parse(mainUrl).host.equals("preprod.instabill.in", ignoreCase = true)) {
+            setOf("preprod.instabill.in")
+        } else {
+            setOf(
+                "clearbills.info",
+                "www.clearbills.info",
+                "instabill.in",
+                "www.instabill.in",
+                "clearbill.store",
+                "www.clearbill.store"
+            )
+        }
+    }
 
     private val GOOGLE_WEB_CLIENT_ID = "642231628593-eso4jie2p3cu670djrtqauq0qh741nk3.apps.googleusercontent.com"
 
@@ -152,7 +170,7 @@ class MainActivity : AppCompatActivity() {
         setupSwipeRefresh()
         checkPermissions()
 
-        var urlToLoad = MAIN_URL
+        var urlToLoad = mainUrl
 
         if (intent.extras != null && intent.hasExtra("TARGET_URL")) {
             val targetUrl = intent.getStringExtra("TARGET_URL")
@@ -162,14 +180,7 @@ class MainActivity : AppCompatActivity() {
                     val parsedUri = Uri.parse(targetUrl)
                     val host = parsedUri.host?.lowercase(Locale.ROOT) ?: ""
 
-                    val safeHosts = listOf(
-                        "clearbills.info",
-                        "www.clearbills.info",
-                        "clearbill.store",
-                        "www.clearbill.store"
-                    )
-
-                    if (safeHosts.contains(host)) {
+                    if (host in trustedNotificationHosts) {
                         // 🟢 FOOLPROOF FIX: REBUILD THE URL ENTIRELY
                         // We do NOT use the raw 'targetUrl' string. This breaks the bot's taint tracking.
                         val safeUrlBuilder = Uri.Builder()
@@ -201,7 +212,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupSwipeRefresh() {
         swipeRefreshLayout.setOnRefreshListener {
-            val urlToLoad = webView.url ?: MAIN_URL
+            val urlToLoad = webView.url ?: mainUrl
             webView.loadUrl(urlToLoad)
         }
 

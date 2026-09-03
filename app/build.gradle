@@ -15,13 +15,29 @@ android {
         applicationId "info.clearbills.app"
         minSdk 23
         targetSdk 36
-        versionCode 17
-        versionName "1.0.5"
+        versionCode 18
+        versionName "1.0.6"
+
+        buildConfigField "String", "BASE_URL", '"https://instabill.in/"'
+        buildConfigField "String", "TRUSTED_NOTIFICATION_HOSTS", '"clearbills.info,www.clearbills.info,instabill.in,www.instabill.in,clearbill.store,www.clearbill.store"'
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
+        preprod {
+            initWith debug
+            applicationIdSuffix ".preprod"
+            versionNameSuffix "-preprod"
+            debuggable true
+            signingConfig signingConfigs.debug
+
+            buildConfigField "String", "BASE_URL", '"https://preprod.instabill.in/"'
+            buildConfigField "String", "TRUSTED_NOTIFICATION_HOSTS", '"preprod.instabill.in"'
+            resValue "string", "app_name", "Instabill"
+
+            matchingFallbacks = ['debug']
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
@@ -32,6 +48,7 @@ android {
         targetCompatibility JavaVersion.VERSION_11
     }
     buildFeatures {
+        buildConfig true
         compose true
     }
     kotlinOptions {
