@@ -14,6 +14,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
+import android.provider.Settings
 import android.util.Base64
 import android.util.Log
 import android.view.WindowManager
@@ -26,6 +27,8 @@ import androidx.core.view.WindowCompat
 import androidx.print.PrintHelper
 import java.io.IOException
 import java.util.UUID
+import org.json.JSONArray
+import org.json.JSONObject
 
 
 class WebAppInterface(private val activity: AppCompatActivity, private val webView: WebView) {
@@ -115,6 +118,52 @@ class WebAppInterface(private val activity: AppCompatActivity, private val webVi
                 }
             }
         }.start()
+    }
+
+    /**
+     * Returns the thermal printers already paired in Android Bluetooth settings.
+     * A WebView cannot enumerate classic Bluetooth devices itself, so this is
+     * deliberately exposed to the Settings page as a small native bridge.
+     */
+    @JavascriptInterface
+    fun getPairedPrinters(): String {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            ActivityCompat.checkSelfPermission(activity, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
+        ) {
+            return "[]"
+        }
+
+        val adapter = BluetoothAdapter.getDefaultAdapter() ?: return "[]"
+        val result = JSONArray()
+
+        adapter.bondedDevices
+            .filter { isLikelyPrinter(it) }
+            .forEach { device ->
+                result.put(JSONObject().apply {
+                    put("name", device.name ?: "Unnamed printer")
+                    put("address", device.address ?: device.name ?: "unknown")
+                })
+            }
+
+        return result.toString()
+    }
+
+    @JavascriptInterface
+    fun isBluetoothEnabled(): Boolean {
+        return BluetoothAdapter.getDefaultAdapter()?.isEnabled == true
+    }
+
+    /** Opens the system screen where Android handles Bluetooth pairing securely. */
+    @JavascriptInterface
+    fun openBluetoothSettings() {
+        activity.runOnUiThread {
+            try {
+                activity.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
+            } catch (error: Exception) {
+                Toast.makeText(activity, "Unable to open Bluetooth settings", Toast.LENGTH_SHORT).show()
+                Log.e("BLUETOOTH", "Could not open Bluetooth settings", error)
+            }
+        }
     }
 
     @JavascriptInterface
@@ -217,15 +266,8 @@ class WebAppInterface(private val activity: AppCompatActivity, private val webVi
         if (adapter == null || !adapter.isEnabled) return false
 
         // 2. Find Paired Printer (Explicitly typed as BluetoothDevice)
-        val printer: BluetoothDevice = adapter.bondedDevices.firstOrNull {
-            it.name != null && (
-                    it.name.contains("mt", true) ||
-                            it.name.contains("printer", true) ||
-                            it.name.contains("thermal", true) ||
-                            it.name.contains("pos", true) ||
-                            it.name.contains("rpp", true)
-                    )
-        } ?: return false // Exit if no printer found
+        val printer: BluetoothDevice = adapter.bondedDevices.firstOrNull(::isLikelyPrinter)
+            ?: return false // Exit if no printer found
 
         return try {
             // 3. Connect Socket
@@ -285,6 +327,16 @@ class WebAppInterface(private val activity: AppCompatActivity, private val webVi
         } catch (e: Exception) {
             Toast.makeText(activity, "System Print Failed", Toast.LENGTH_SHORT).show()
         }
+    }
+
+    private fun isLikelyPrinter(device: BluetoothDevice): Boolean {
+        val name = device.name ?: ""
+        return device.bluetoothClass?.deviceClass == 1664 ||
+                name.contains("mt", true) ||
+                name.contains("printer", true) ||
+                name.contains("thermal", true) ||
+                name.contains("pos", true) ||
+                name.contains("rpp", true)
     }
     @JavascriptInterface
     fun vibrate(milliseconds: Int) {

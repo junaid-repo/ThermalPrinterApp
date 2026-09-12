@@ -2,7 +2,12 @@ package info.clearbills.app
 
 import android.Manifest
 import android.app.Activity
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.database.Cursor
@@ -74,8 +79,18 @@ class MainActivity : AppCompatActivity() {
     private lateinit var swipeRefreshLayout: SwipeRefreshLayout
     private lateinit var downloadHandler: DownloadHandler
 
-     private var filePathCallback: ValueCallback<Array<Uri>>? = null
+    private var filePathCallback: ValueCallback<Array<Uri>>? = null
     private var cameraPhotoPath: String? = null
+    private var isBluetoothReceiverRegistered = false
+
+    private val bluetoothStatusReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            when (intent?.action) {
+                BluetoothAdapter.ACTION_STATE_CHANGED,
+                BluetoothDevice.ACTION_BOND_STATE_CHANGED -> notifyPrinterStatusChanged()
+            }
+        }
+    }
 
      private val fileChooserLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         var results: Array<Uri>? = null
@@ -202,12 +217,54 @@ class MainActivity : AppCompatActivity() {
         }
 
         webView.addJavascriptInterface(WebAppInterface(this, webView), "Android")
+        registerBluetoothStatusReceiver()
         webView.loadUrl(urlToLoad)
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 if (webView.canGoBack()) webView.goBack() else isEnabled = false
             }
         })
+    }
+
+    override fun onResume() {
+        super.onResume()
+
+        // Android's Bluetooth settings can change paired devices while this app is
+        // in the background. Notify the WebView immediately when it returns.
+        notifyPrinterStatusChanged()
+    }
+
+    override fun onDestroy() {
+        if (isBluetoothReceiverRegistered) unregisterReceiver(bluetoothStatusReceiver)
+        super.onDestroy()
+    }
+
+    private fun registerBluetoothStatusReceiver() {
+        if (isBluetoothReceiverRegistered) return
+
+        val filter = IntentFilter().apply {
+            addAction(BluetoothAdapter.ACTION_STATE_CHANGED)
+            addAction(BluetoothDevice.ACTION_BOND_STATE_CHANGED)
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(bluetoothStatusReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("DEPRECATION")
+            registerReceiver(bluetoothStatusReceiver, filter)
+        }
+        isBluetoothReceiverRegistered = true
+    }
+
+    private fun notifyPrinterStatusChanged() {
+        if (!::webView.isInitialized) return
+
+        webView.post {
+            webView.evaluateJavascript(
+                "window.dispatchEvent(new Event('printerstatuschange'));",
+                null
+            )
+        }
     }
 
     private fun setupSwipeRefresh() {
